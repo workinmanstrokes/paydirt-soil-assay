@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17100b">
+<meta name="description" content="Paydirt: Soil &amp; Gold Assay. Probe a 6x6 claim, dig the pay dirt, and bank your gold in 60 seconds.">
+<title>Paydirt: Soil &amp; Gold Assay</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317100b'/%3E%3Cpath d='M8 20l5-9 6 3 5 5-4 5-9-1z' fill='%23e8b83a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div>
+      <h1>Paydirt</h1>
+      <p class="sub">Soil &amp; Gold Assay · Claim <span id="claimNo">1</span></p>
+    </div>
+    <button id="mute" class="icon" type="button" aria-label="Mute sound" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12" fill="none" stroke-width="1.8" stroke-linecap="round"/><path class="cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+
+  <section class="stats" aria-label="Claim status">
+    <div class="stat gold"><span class="k">Gold</span><span class="v"><b id="gold">0.0</b> g</span><span class="s">Pay dirt <span id="found">0/8</span></span></div>
+    <div class="stat"><span class="k">Energy</span><span class="v"><b id="energy">18</b></span><span class="bar" id="pips"></span></div>
+    <div class="stat"><span class="k">Time</span><span class="v"><b id="time">60</b> s</span><span class="bar" id="clock"></span></div>
+  </section>
+
+  <section class="board">
+    <div id="grid" class="grid" data-tool="probe" aria-label="Dirt claim, 6 by 6"></div>
+  </section>
+
+  <section class="tools" aria-label="Tools">
+    <button id="tool-probe" class="tool probe" type="button" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v13M8 6h8M9 15h6l-3 7z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>Soil Probe</b><small>1 energy · reads nearby pay dirt</small></span>
+    </button>
+    <button id="tool-dig" class="tool dig" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3l7 7-3 1-5-5zM15 8L4 19l1 1 11-11M9 21c-3 0-5-2-5-5" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span><b>Assay Shovel</b><small>2 energy · digs the tile</small></span>
+    </button>
+  </section>
+
+  <footer class="foot">
+    <span>Purse <b id="purse">0.0</b> g</span>
+    <span>Best claim <b id="best">0.0</b> g</span>
+  </footer>
+
+  <div id="intro" class="sheet">
+    <div class="card">
+      <p class="eyebrow">Sixty seconds. One claim.</p>
+      <h2>Find the pay dirt</h2>
+      <ul class="how">
+        <li><b class="t">Probe</b> a tile to read how many of its neighbours hold gold. It costs 1 energy and breaks no ground.</li>
+        <li><b class="g">Dig</b> where the readings point. A shovel costs 2 energy, and gold only counts once it is out of the ground.</li>
+        <li>You have 18 energy and 60 seconds. The clock starts on your first move.</li>
+      </ul>
+      <button id="start" class="cta" type="button">Stake the claim</button>
+    </div>
+  </div>
+
+  <div id="report" class="sheet" hidden>
+    <div class="card" role="dialog" aria-labelledby="r-grade">
+      <p class="eyebrow" id="r-reason">Time's up</p>
+      <h2 id="r-grade">Prospector</h2>
+      <p class="record" id="r-record" hidden>New best claim</p>
+      <dl class="tally">
+        <div><dt>Gold assayed</dt><dd id="r-gold">0.0 g</dd></div>
+        <div><dt>Pay dirt found</dt><dd id="r-found">0 of 8</dd></div>
+        <div><dt>Left in the ground</dt><dd id="r-left">0.0 g</dd></div>
+      </dl>
+      <button id="next" class="cta" type="button">Stake the next claim</button>
+    </div>
+  </div>
+</main>
+<script src="game.js"></script>
+</body>
+</html>
