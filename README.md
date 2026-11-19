@@ -1,10 +1,10 @@
 # Paydirt: Soil & Gold Assay
-Find the hidden pay streak and dig its gold in 60 seconds.
-Rules: you get 5 Soil Probes and 3 Assay Shovel digs per run.
-Probe a cell to learn HOT (in the streak or next to it) or COLD (nowhere near it).
-Dig a cell with the Shovel to reveal its gold in grams; only pay-streak cells hold gold.
-Score is total gold weighed in grams and troy ounces (1 troy oz = 31.1035 g).
-The timer stops all probing and digging at 0:00 — digs after the whistle do not count.
-A good run finds the streak with probes to spare and digs 3 streak cells for 15+ grams.
-Your best total is saved on this device; beat it to set a new best.
+Find the hidden pay dirt and dig its gold in 60 seconds.
+Rules: you get 18 energy and 60 seconds per claim; the clock starts on your first move.
+Probe a tile for 1 energy to read how many of its neighbours hold gold — it breaks no ground.
+Dig a tile with the Assay Shovel for 2 energy to pull its gold out of the ground.
+There are 8 pay-dirt tiles per claim; gold only counts once it is dug up.
+Score is total gold weighed in grams; the end report also shows gold left in the ground.
+A good run probes to map the pay dirt, then digs 6 or more of the 8 pay tiles.
+Your best claim is saved on this device; beat it to set a new best.
 Open index.html in any desktop or mobile browser — no install, no server, no account.

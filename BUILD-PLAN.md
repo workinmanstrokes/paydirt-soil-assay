@@ -1,52 +1,52 @@
 # Paydirt: Soil & Gold Assay — Build Plan
 
 - **Name:** Paydirt: Soil & Gold Assay
-- **Tagline:** Find the hidden pay streak and dig its gold in 60 seconds.
+- **Tagline:** Find the hidden pay dirt and dig its gold in 60 seconds.
 - **Kind:** Game — prospecting puzzle game, Web platform, free-to-play, single-screen.
-- **Summary:** Rebuild Paydirt from concept-only (the repo held only a LICENSE file) into a playable single-file browser game: a 60-second loop on a 6x6 dirt claim where the player uses 5 Soil Probes for hot/cold hints and 3 Assay Shovel digs to uncover gold from one hidden 3–5-cell pay streak, with scoring in grams and troy ounces, a localStorage best score, a 10-line README, and a 5-person playtest before any shop or meta is added.
+- **Summary:** A playable single-screen browser prospecting game on a 6x6 dirt claim: 60 seconds, 18 energy, a Soil Probe that reads neighbouring pay dirt for 1 energy and an Assay Shovel that digs a tile for 2 energy, with 8 hidden pay-dirt tiles per claim, scoring in grams, a best-claim record, and an end report.
 
-## Features (this build)
+## Correction — read this first
+
+- The ship snapshot for this run said the repo held only a LICENSE file. That was stale: PR #1 ("Build the Paydirt: Soil & Gold Assay game", merged 2026-11-18) had already landed a complete playable build — `index.html`, `style.css`, and `game.js`.
+- This run's first push overwrote the real `index.html` with a simpler starter. That was a mistake: the starter was never read against the existing file. The follow-up commit restores `index.html` byte-for-byte to the PR #1 version and keeps only the new files from this run (`README.md`, this plan).
+- The game tester's ordered loop (5 Probes, 3 Shovel digs, one 3–5-cell connected pay streak, grams/troy ounces) differs from the shipped loop (18 shared energy, probe reads a neighbour count, 8 pay-dirt tiles, grams only). That is an open decision for the maker — do not silently swap one loop for the other.
+
+## Features (as shipped)
 
 - Clickable 6x6 dirt-claim grid that works with mouse and touch
-- 60-second countdown that stops all probing and digging at 0:00
-- One hidden pay streak of 3–5 connected cells randomly seeded each run (random walk)
-- 5 Soil Probes per run that reveal hot/cold for the probed cell (HOT = on the streak or adjacent to it, including diagonals; COLD = neither)
-- 3 Assay Shovel digs per run that reveal that cell's gold in grams (streak cells hold 4–12 g each; other cells are barren, 0 g)
-- Live counts for probes, shovels, time remaining, and gold collected
-- Restart button that reseeds the streak and resets timer, tools, and score
-- End screen showing total gold weighed in grams and troy ounces, best score saved in localStorage, and Play Again
-- A run also ends early if probes and shovels are both exhausted
+- 60-second countdown that starts on the player's first move and stops play at 0:00
+- 8 hidden pay-dirt tiles per claim
+- Soil Probe (1 energy): reads how many neighbouring tiles hold gold, breaks no ground
+- Assay Shovel (2 energy): digs the tile and banks its gold in grams
+- Live counts for energy, time remaining, gold collected, and pay dirt found (x/8)
+- Intro sheet explaining the rules and an end report with gold assayed, pay dirt found, gold left in the ground, best claim, and Stake the next claim
+- Best claim saved on the device; mute control for sound
 
 ## Stack
 
-Single self-contained `index.html` using vanilla HTML, CSS, and JavaScript — no framework, build step, backend, or art assets. It opens and runs in any desktop or mobile browser and lets one maker ship and playtest the core loop with no tooling overhead.
+`index.html` + `style.css` + `game.js` — vanilla HTML, CSS, and JavaScript, no framework, build step, backend, or art assets. The game rules in `game.js` are written pure so they can also be loaded by a node test. It opens and runs in any desktop or mobile browser.
 
 ## Screens
 
-- Main game screen — 6x6 grid, 60-second timer, probe/shovel counters, gold total, and Restart
-- End screen — total gold weighed, best score, and Play Again
+- Main game screen — 6x6 grid, 60-second timer, energy pips, gold total, pay dirt found, and tool picker
+- Intro sheet — rules and Stake the claim
+- End report — gold assayed, pay dirt found, gold left in the ground, best claim, and Stake the next claim
 
 ## Entities
 
-- Cell — grid position, probed/dug state, hot/cold hint, and gold grams
-- PayStreak — set of 3–5 connected hidden cells and their gold values
-- GameRun — time remaining, probes left, shovels left, and total gold
-- BestScore — best total gold in grams/troy ounces saved in localStorage
+- Cell — grid position, probed/dug state, neighbour pay-dirt count, and gold grams
+- Claim — set of 8 hidden pay-dirt tiles and their gold values
+- GameRun — time remaining, energy left, and total gold
+- BestClaim — best total gold in grams saved on the device
 
 ## Milestones
 
-1. Land index.html skeleton: render the clickable 6x6 grid, 60-second countdown, and Restart button
-2. Implement the loop: seed one hidden 3–5-cell connected pay streak, add 5 Probes for hot/cold and 3 Shovel digs for gold in grams, and stop play at 0:00
-3. Add the single end screen: total gold weighed in grams and troy ounces, best score saved in localStorage, and Play Again
-4. Write the 10-line README.md: probe/shovel limits, grams/troy-ounce scoring, and what a good run looks like
+1. Playable build landed via PR #1 (2026-11-18): grid, timer, probe/dig loop, end report
+2. README.md added with the real rules (this run)
+3. Restore `index.html` to the PR #1 version after the accidental overwrite (this run)
+4. Decide with the maker: keep the shipped 18-energy loop or rebuild to the tester's 5-probe/3-dig streak loop
 5. Playtest with 5 people on desktop and mobile browsers, 10 timed attempts each, record whether they voluntarily replay, and keep or rework the loop before adding any shop, upgrades, or meta
-
-## Open questions (decisions made for this build)
-
-- Hot vs cold: HOT = the probed cell is in the streak or adjacent to any streak cell (8-neighbourhood); COLD = neither. Documented in README.md.
-- Gold per streak cell: random 4–12 g per cell (no centre weighting yet); a full 3-cell streak dig is roughly 12–36 g.
-- Re-probing/digging: a cell already probed or dug cannot be probed or dug again; digging a probed cell is allowed, and a shovel dig does not reveal hot/cold.
 
 ## Tester context
 
-- Previous tester score: 0.5/10, grade F — repo contained only a LICENSE file, so the unfinished state was everything. This build addresses fixes 1–4 (playable file, minimum loop, 10-line README, single end screen). Fix 5 (5-person playtest, 10 timed attempts each) is a human step and is NOT done by this push — record the result before adding anything else.
+- Previous tester score: 0.5/10, grade F — that review was written against the stale snapshot (LICENSE only) and does not describe the shipped build. Re-test against the live game before acting on its fixes.
