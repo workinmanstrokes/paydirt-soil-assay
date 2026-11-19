@@ -1,79 +1,332 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#17100b">
-<meta name="description" content="Paydirt: Soil &amp; Gold Assay. Probe a 6x6 claim, dig the pay dirt, and bank your gold in 60 seconds.">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Paydirt: Soil &amp; Gold Assay</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317100b'/%3E%3Cpath d='M8 20l5-9 6 3 5 5-4 5-9-1z' fill='%23e8b83a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css">
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #2b1d12; color: #f5e9d0; display: flex; flex-direction: column; align-items: center;
+    padding: 12px;
+  }
+  h1 { font-size: 1.35rem; margin: 6px 0 2px; text-align: center; }
+  .tagline { margin: 0 0 12px; font-size: .9rem; opacity: .85; text-align: center; }
+  .hud {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; max-width: 420px;
+    margin-bottom: 10px;
+  }
+  .stat {
+    background: #3d2a18; border: 1px solid #6b4a26; border-radius: 8px;
+    padding: 6px 10px; font-size: .9rem; text-align: center; min-width: 76px;
+  }
+  .stat b { display: block; font-size: 1.15rem; }
+  .stat .label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; opacity: .75; }
+  #timeStat.low b { color: #ff6b5e; }
+  .tools { display: flex; gap: 8px; margin-bottom: 10px; }
+  .tools button, .actions button {
+    font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid #6b4a26;
+    background: #3d2a18; color: #f5e9d0; padding: 10px 16px;
+  }
+  .tools button[aria-pressed="true"] { background: #c98a2b; border-color: #e8b25a; color: #241708; font-weight: 700; }
+  .tools button:disabled, .actions button:disabled { opacity: .45; cursor: default; }
+  #grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+    width: 100%; max-width: 420px; aspect-ratio: 1 / 1;
+  }
+  .cell {
+    font: inherit; font-size: 1rem; font-weight: 700; cursor: pointer;
+    border: 1px solid #6b4a26; border-radius: 6px; background: #5a3d22; color: #f5e9d0;
+    display: flex; align-items: center; justify-content: center; min-height: 0;
+    touch-action: manipulation; user-select: none;
+  }
+  .cell:active { filter: brightness(1.25); }
+  .cell.probed-hot { background: #b3541e; }
+  .cell.probed-cold { background: #3a3f4a; color: #aeb8cc; }
+  .cell.dug { background: #c98a2b; color: #241708; font-size: .8rem; }
+  .cell.dug-barren { background: #4a4038; color: #cfc4b2; font-size: .8rem; }
+  .cell:disabled { cursor: default; }
+  #message { min-height: 1.4em; margin: 10px 0 4px; font-size: .95rem; text-align: center; max-width: 420px; }
+  .actions { display: flex; gap: 8px; margin-top: 6px; }
+  .hint { font-size: .8rem; opacity: .75; margin-top: 10px; text-align: center; max-width: 420px; }
+  #endScreen {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .72); padding: 16px; z-index: 10;
+  }
+  #endScreen.show { display: flex; }
+  .end-card {
+    background: #3d2a18; border: 1px solid #c98a2b; border-radius: 12px; padding: 24px;
+    text-align: center; max-width: 360px; width: 100%;
+  }
+  .end-card h2 { margin: 0 0 8px; }
+  .end-card p { margin: 6px 0; }
+  .end-card .big { font-size: 1.6rem; font-weight: 800; }
+  .end-card button {
+    font: inherit; cursor: pointer; border-radius: 8px; border: none; margin-top: 14px;
+    background: #c98a2b; color: #241708; font-weight: 700; padding: 12px 22px;
+  }
+</style>
 </head>
 <body>
-<main class="app">
-  <header class="top">
-    <div>
-      <h1>Paydirt</h1>
-      <p class="sub">Soil &amp; Gold Assay · Claim <span id="claimNo">1</span></p>
-    </div>
-    <button id="mute" class="icon" type="button" aria-label="Mute sound" aria-pressed="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12" fill="none" stroke-width="1.8" stroke-linecap="round"/><path class="cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>
-    </button>
-  </header>
+  <h1>&#9978; Paydirt: Soil &amp; Gold Assay</h1>
+  <p class="tagline">Find the hidden pay streak and dig its gold in 60 seconds.</p>
 
-  <section class="stats" aria-label="Claim status">
-    <div class="stat gold"><span class="k">Gold</span><span class="v"><b id="gold">0.0</b> g</span><span class="s">Pay dirt <span id="found">0/8</span></span></div>
-    <div class="stat"><span class="k">Energy</span><span class="v"><b id="energy">18</b></span><span class="bar" id="pips"></span></div>
-    <div class="stat"><span class="k">Time</span><span class="v"><b id="time">60</b> s</span><span class="bar" id="clock"></span></div>
-  </section>
+  <div class="hud" role="status" aria-live="polite">
+    <div class="stat" id="timeStat"><span class="label">Time left</span><b id="time">1:00</b></div>
+    <div class="stat"><span class="label">Probes left</span><b id="probes">5</b></div>
+    <div class="stat"><span class="label">Shovel digs left</span><b id="shovels">3</b></div>
+    <div class="stat"><span class="label">Gold</span><b id="gold">0.0 g</b></div>
+  </div>
 
-  <section class="board">
-    <div id="grid" class="grid" data-tool="probe" aria-label="Dirt claim, 6 by 6"></div>
-  </section>
+  <div class="tools" role="group" aria-label="Choose a tool">
+    <button id="probeBtn" type="button" aria-pressed="true">&#128269; Soil Probe (<span id="probeCount">5</span>)</button>
+    <button id="shovelBtn" type="button" aria-pressed="false">&#9978; Assay Shovel (<span id="shovelCount">3</span>)</button>
+  </div>
 
-  <section class="tools" aria-label="Tools">
-    <button id="tool-probe" class="tool probe" type="button" aria-pressed="true">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v13M8 6h8M9 15h6l-3 7z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span><b>Soil Probe</b><small>1 energy · reads nearby pay dirt</small></span>
-    </button>
-    <button id="tool-dig" class="tool dig" type="button" aria-pressed="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3l7 7-3 1-5-5zM15 8L4 19l1 1 11-11M9 21c-3 0-5-2-5-5" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span><b>Assay Shovel</b><small>2 energy · digs the tile</small></span>
-    </button>
-  </section>
+  <div id="grid" role="grid" aria-label="6 by 6 dirt claim"></div>
+  <p id="message" aria-live="polite">Pick a tool, then tap a cell. HOT means the streak is on that cell or right next to it.</p>
 
-  <footer class="foot">
-    <span>Purse <b id="purse">0.0</b> g</span>
-    <span>Best claim <b id="best">0.0</b> g</span>
-  </footer>
+  <div class="actions">
+    <button id="restartBtn" type="button">Restart</button>
+  </div>
+  <p class="hint">One hidden pay streak of 3&ndash;5 connected cells holds all the gold. Probes never dig; shovels never hint. A dug cell cannot be probed or dug again.</p>
 
-  <div id="intro" class="sheet">
-    <div class="card">
-      <p class="eyebrow">Sixty seconds. One claim.</p>
-      <h2>Find the pay dirt</h2>
-      <ul class="how">
-        <li><b class="t">Probe</b> a tile to read how many of its neighbours hold gold. It costs 1 energy and breaks no ground.</li>
-        <li><b class="dig">Dig</b> where the readings point. A shovel costs 2 energy, and gold only counts once it is out of the ground.</li>
-        <li>You have 18 energy and 60 seconds. The clock starts on your first move.</li>
-      </ul>
-      <button id="start" class="cta" type="button">Stake the claim</button>
+  <div id="endScreen" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+    <div class="end-card">
+      <h2 id="endTitle">Time&rsquo;s up &mdash; weigh-in!</h2>
+      <p class="big" id="endGold">0.0 g</p>
+      <p id="endOz">0.00 troy oz</p>
+      <p id="endBest">Best: 0.0 g</p>
+      <p id="endNote"></p>
+      <button id="playAgainBtn" type="button">Play Again</button>
     </div>
   </div>
 
-  <div id="report" class="sheet" hidden>
-    <div class="card" role="dialog" aria-labelledby="r-grade">
-      <p class="eyebrow" id="r-reason">Time's up</p>
-      <h2 id="r-grade">Prospector</h2>
-      <p class="record" id="r-record" hidden>New best claim</p>
-      <dl class="tally">
-        <div><dt>Gold assayed</dt><dd id="r-gold">0.0 g</dd></div>
-        <div><dt>Pay dirt found</dt><dd id="r-found">0 of 8</dd></div>
-        <div><dt>Left in the ground</dt><dd id="r-left">0.0 g</dd></div>
-      </dl>
-      <button id="next" class="cta" type="button">Stake the next claim</button>
-    </div>
-  </div>
-</main>
-<script src="game.js"></script>
+<script>
+(function () {
+  "use strict";
+  var SIZE = 6, RUN_SECONDS = 60, MAX_PROBES = 5, MAX_SHOVELS = 3;
+  var GRAMS_PER_TROY_OZ = 31.1035;
+  var BEST_KEY = "paydirt-soil-assay-best-grams";
+
+  var gridEl = document.getElementById("grid");
+  var timeEl = document.getElementById("time");
+  var timeStat = document.getElementById("timeStat");
+  var probesEl = document.getElementById("probes");
+  var shovelsEl = document.getElementById("shovels");
+  var goldEl = document.getElementById("gold");
+  var probeCountEl = document.getElementById("probeCount");
+  var shovelCountEl = document.getElementById("shovelCount");
+  var probeBtn = document.getElementById("probeBtn");
+  var shovelBtn = document.getElementById("shovelBtn");
+  var restartBtn = document.getElementById("restartBtn");
+  var messageEl = document.getElementById("message");
+  var endScreen = document.getElementById("endScreen");
+  var endGold = document.getElementById("endGold");
+  var endOz = document.getElementById("endOz");
+  var endBest = document.getElementById("endBest");
+  var endNote = document.getElementById("endNote");
+  var playAgainBtn = document.getElementById("playAgainBtn");
+
+  var streak = {};      // "r,c" -> gold grams in that cell
+  var probed = {};      // "r,c" -> true
+  var dug = {};         // "r,c" -> true
+  var probesLeft, shovelsLeft, goldGrams, timeLeft, tool, timerId, over;
+
+  function key(r, c) { return r + "," + c; }
+  function neighbours(r, c) {
+    var out = [];
+    for (var dr = -1; dr <= 1; dr++) {
+      for (var dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        var nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) out.push(key(nr, nc));
+      }
+    }
+    return out;
+  }
+  function randomCell() {
+    return { r: Math.floor(Math.random() * SIZE), c: Math.floor(Math.random() * SIZE) };
+  }
+
+  // Seed one connected pay streak of 3-5 cells by random walk.
+  function seedStreak() {
+    streak = {};
+    var target = 3 + Math.floor(Math.random() * 3); // 3, 4 or 5
+    var start = randomCell();
+    var frontier = [start];
+    streak[key(start.r, start.c)] = true;
+    var guard = 0;
+    while (Object.keys(streak).length < target && guard < 200) {
+      guard++;
+      var cell = frontier[Math.floor(Math.random() * frontier.length)];
+      var parts = cell.split(",");
+      var r = +parts[0], c = +parts[1];
+      var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      var d = dirs[Math.floor(Math.random() * dirs.length)];
+      var nr = r + d[0], nc = c + d[1];
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
+      var k = key(nr, nc);
+      if (streak[k]) continue;
+      streak[k] = true;
+      frontier.push(k);
+    }
+    // Each streak cell holds 4-12 g of gold.
+    Object.keys(streak).forEach(function (k) {
+      streak[k] = 4 + Math.floor(Math.random() * 9);
+    });
+  }
+
+  function isHot(r, c) {
+    var k = key(r, c);
+    if (streak[k]) return true;
+    return neighbours(r, c).some(function (nk) { return streak[nk]; });
+  }
+
+  function fmtTime(s) {
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+  function fmtOz(g) { return (g / GRAMS_PER_TROY_OZ).toFixed(2) + " troy oz"; }
+
+  function getBest() {
+    var v = parseFloat(localStorage.getItem(BEST_KEY));
+    return isNaN(v) ? 0 : v;
+  }
+  function saveBest(g) { localStorage.setItem(BEST_KEY, String(g)); }
+
+  function renderHud() {
+    timeEl.textContent = fmtTime(Math.max(0, timeLeft));
+    timeStat.classList.toggle("low", timeLeft <= 10 && !over);
+    probesEl.textContent = probesLeft;
+    shovelsEl.textContent = shovelsLeft;
+    goldEl.textContent = goldGrams.toFixed(1) + " g";
+    probeCountEl.textContent = probesLeft;
+    shovelCountEl.textContent = shovelsLeft;
+    probeBtn.disabled = probesLeft <= 0 || over;
+    shovelBtn.disabled = shovelsLeft <= 0 || over;
+    probeBtn.setAttribute("aria-pressed", tool === "probe" ? "true" : "false");
+    shovelBtn.setAttribute("aria-pressed", tool === "shovel" ? "true" : "false");
+  }
+
+  function buildGrid() {
+    gridEl.innerHTML = "";
+    for (var r = 0; r < SIZE; r++) {
+      for (var c = 0; c < SIZE; c++) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "cell";
+        b.dataset.r = r;
+        b.dataset.c = c;
+        b.setAttribute("role", "gridcell");
+        b.setAttribute("aria-label", "Claim cell row " + (r + 1) + ", column " + (c + 1));
+        b.textContent = "\u00B7";
+        b.addEventListener("click", onCell);
+        gridEl.appendChild(b);
+      }
+    }
+  }
+
+  function onCell(e) {
+    if (over) return;
+    var b = e.currentTarget;
+    var r = +b.dataset.r, c = +b.dataset.c, k = key(r, c);
+    if (dug[k] || probed[k]) {
+      messageEl.textContent = "That cell is already worked. Pick a fresh one.";
+      return;
+    }
+    if (tool === "probe") {
+      if (probesLeft <= 0) { messageEl.textContent = "Out of probes — switch to the Shovel."; return; }
+      probesLeft--;
+      probed[k] = true;
+      b.disabled = true;
+      if (isHot(r, c)) {
+        b.classList.add("probed-hot");
+        b.textContent = "HOT";
+        messageEl.textContent = "HOT — the pay streak is on this cell or right next to it.";
+      } else {
+        b.classList.add("probed-cold");
+        b.textContent = "cold";
+        messageEl.textContent = "Cold — no pay dirt on this cell or next to it.";
+      }
+      if (probesLeft === 0 && shovelsLeft > 0) setTool("shovel");
+    } else {
+      if (shovelsLeft <= 0) { messageEl.textContent = "Out of shovel digs."; return; }
+      shovelsLeft--;
+      dug[k] = true;
+      b.disabled = true;
+      var g = streak[k] || 0;
+      if (g > 0) {
+        goldGrams += g;
+        b.classList.add("dug");
+        b.textContent = g + " g";
+        messageEl.textContent = "Gold! " + g + " g from this cell. Total: " + goldGrams.toFixed(1) + " g.";
+      } else {
+        b.classList.add("dug-barren");
+        b.textContent = "0 g";
+        messageEl.textContent = "Barren — no gold in this cell.";
+      }
+    }
+    renderHud();
+    if (probesLeft === 0 && shovelsLeft === 0) endRun("Out of tools — weigh-in!");
+  }
+
+  function setTool(t) {
+    if (over) return;
+    tool = t;
+    renderHud();
+  }
+
+  function tick() {
+    timeLeft--;
+    renderHud();
+    if (timeLeft <= 0) endRun("Time's up — weigh-in!");
+  }
+
+  function endRun(title) {
+    if (over) return;
+    over = true;
+    clearInterval(timerId);
+    document.getElementById("endTitle").textContent = title;
+    var best = getBest();
+    var isNewBest = goldGrams > best;
+    if (isNewBest) { saveBest(goldGrams); best = goldGrams; }
+    endGold.textContent = goldGrams.toFixed(1) + " g";
+    endOz.textContent = fmtOz(goldGrams);
+    endBest.textContent = "Best: " + best.toFixed(1) + " g (" + fmtOz(best) + ")" + (isNewBest ? " — new best!" : "");
+    endNote.textContent = goldGrams >= 15
+      ? "A strong run — you found the streak and dug it well."
+      : "A good run digs 3 streak cells for 15+ g. Probe hot, then dig the heat.";
+    endScreen.classList.add("show");
+    renderHud();
+  }
+
+  function newRun() {
+    clearInterval(timerId);
+    seedStreak();
+    probed = {};
+    dug = {};
+    probesLeft = MAX_PROBES;
+    shovelsLeft = MAX_SHOVELS;
+    goldGrams = 0;
+    timeLeft = RUN_SECONDS;
+    tool = "probe";
+    over = false;
+    endScreen.classList.remove("show");
+    messageEl.textContent = "Pick a tool, then tap a cell. HOT means the streak is on that cell or right next to it.";
+    buildGrid();
+    renderHud();
+    timerId = setInterval(tick, 1000);
+  }
+
+  probeBtn.addEventListener("click", function () { setTool("probe"); });
+  shovelBtn.addEventListener("click", function () { setTool("shovel"); });
+  restartBtn.addEventListener("click", newRun);
+  playAgainBtn.addEventListener("click", newRun);
+
+  newRun();
+})();
+</script>
 </body>
 </html>
