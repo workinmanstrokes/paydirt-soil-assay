@@ -2,7 +2,14 @@
 
 /* ---------- Rules (pure, also loaded by test.js under node) ---------- */
 const Paydirt = (() => {
-  const SIZE = 6, ENERGY = 18, SECONDS = 60, PROBE_COST = 1, DIG_COST = 2;
+  const SIZE = 6, SECONDS = 60, PROBES = 5, DIGS = 3;
+
+  // Balatro-style escalating ante quota: Ante 1 asks 12 g, each later
+  // ante asks roughly 40% more. Per-cell yield scales too (x1.35 per
+  // ante), so a good player keeps up for a few antes and the run
+  // usually ends at Ante 3-5. Simulation results in BUILD-PLAN.md.
+  function quota(ante) { return Math.round(12 * Math.pow(1.4, ante - 1) * 10) / 10; }
+  function yieldScale(ante) { return Math.pow(1.35, ante - 1); }
 
   function rng(seed) {
     let a = seed >>> 0;
@@ -25,40 +32,49 @@ const Paydirt = (() => {
     return out;
   }
 
-  // Later claims are leaner: 8 pay-dirt tiles at first, down to 5.
-  function payCount(claimNo) { return Math.max(5, 8 - Math.floor((claimNo - 1) / 3)); }
-
-  function newClaim(seed, claimNo = 1) {
+  // A hidden pay streak: 3-5 connected cells grown from a random start
+  // by adding frontier neighbours, so the walk never gets stuck. One
+  // cell is the mother lode; the rest are ordinary nuggets. The streak
+  // is longest at Ante 1 (5 cells, easiest to find) and shrinks as the
+  // antes rise, while each cell gets richer — finding the streak is the
+  // skill, and later antes demand sharper probing.
+  function newClaim(seed, ante = 1) {
     const rand = rng(seed);
+    const scale = yieldScale(ante);
     const tiles = Array.from({ length: SIZE * SIZE }, () => ({ pay: false, grams: 0, state: 'dirt', count: 0 }));
-    const order = tiles.map((_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
+    const streakLen = Math.max(3, 5 - Math.floor((ante - 1) / 2));
+    const start = Math.floor(rand() * SIZE * SIZE);
+    const streak = [start];
+    const inStreak = new Set([start]);
+    while (streak.length < streakLen) {
+      const frontier = [];
+      streak.forEach((i) => neighbours(i).forEach((j) => { if (!inStreak.has(j)) frontier.push(j); }));
+      const pick = frontier[Math.floor(rand() * frontier.length)];
+      streak.push(pick);
+      inStreak.add(pick);
     }
-    const n = payCount(claimNo);
-    order.slice(0, n).forEach((idx, k) => {
+    const lode = Math.floor(rand() * streak.length);
+    streak.forEach((idx, k) => {
       tiles[idx].pay = true;
-      // One mother lode per claim, the rest ordinary nuggets.
-      tiles[idx].grams = Math.round((k === 0 ? 5 + rand() * 2 : 0.8 + rand() * 2.4) * 10) / 10;
+      tiles[idx].grams = Math.round((k === lode ? 6 + rand() * 2 : 3.5 + rand() * 2.5) * scale * 10) / 10;
     });
     tiles.forEach((t, i) => { t.count = neighbours(i).filter((j) => tiles[j].pay).length; });
     const available = Math.round(tiles.reduce((s, t) => s + t.grams, 0) * 10) / 10;
-    return { tiles, energy: ENERGY, gold: 0, found: 0, pay: n, available, claimNo, seed };
+    return { tiles, probes: PROBES, digs: DIGS, gold: 0, found: 0, pay: streak.length, available, ante, seed, quota: quota(ante) };
   }
 
   function probe(claim, i) {
     const t = claim.tiles[i];
-    if (!t || t.state !== 'dirt' || claim.energy < PROBE_COST) return null;
-    claim.energy -= PROBE_COST;
+    if (!t || t.state !== 'dirt' || claim.probes <= 0) return null;
+    claim.probes--;
     t.state = 'probed';
     return { count: t.count };
   }
 
   function dig(claim, i) {
     const t = claim.tiles[i];
-    if (!t || t.state === 'empty' || t.state === 'gold' || claim.energy < DIG_COST) return null;
-    claim.energy -= DIG_COST;
+    if (!t || t.state === 'empty' || t.state === 'gold' || claim.digs <= 0) return null;
+    claim.digs--;
     if (!t.pay) { t.state = 'empty'; return { gold: 0, count: t.count }; }
     t.state = 'gold';
     claim.found++;
@@ -66,7 +82,8 @@ const Paydirt = (() => {
     return { gold: t.grams, count: t.count };
   }
 
-  function isOver(claim) { return claim.energy < PROBE_COST || claim.found === claim.pay; }
+  function isOver(claim) { return (claim.probes <= 0 && claim.digs <= 0) || claim.found === claim.pay; }
+  function quotaMet(claim) { return claim.gold >= claim.quota; }
 
   function grade(claim) {
     const share = claim.available ? claim.gold / claim.available : 0;
@@ -77,7 +94,7 @@ const Paydirt = (() => {
     return "Fool's Gold";
   }
 
-  return { SIZE, ENERGY, SECONDS, PROBE_COST, DIG_COST, neighbours, payCount, newClaim, probe, dig, isOver, grade };
+  return { SIZE, SECONDS, PROBES, DIGS, neighbours, quota, yieldScale, newClaim, probe, dig, isOver, quotaMet, grade };
 })();
 
 if (typeof module !== 'undefined') module.exports = Paydirt;
@@ -92,7 +109,7 @@ if (typeof document !== 'undefined') (() => {
   };
 
   let claim = null, tool = 'probe', timeLeft = Paydirt.SECONDS, ticking = null, over = true;
-  let claimNo = 1, purse = store.get('purse', 0), best = store.get('best', 0), muted = store.get('muted', false);
+  let ante = 1, purse = store.get('purse', 0), bestAnte = store.get('bestAnte', 1), bestGold = store.get('bestGold', 0), muted = store.get('muted', false);
   let audio = null;
 
   function blip(freq, dur = 0.09, type = 'sine', vol = 0.06) {
@@ -136,15 +153,23 @@ if (typeof document !== 'undefined') (() => {
     [...$('grid').children].forEach((b, i) => paintTile(b, claim.tiles[i], reveal));
     $('gold').textContent = claim.gold.toFixed(1);
     $('found').textContent = `${claim.found}/${claim.pay}`;
-    $('energy').textContent = claim.energy;
-    $('pips').style.setProperty('--fill', (claim.energy / Paydirt.ENERGY * 100) + '%');
+    $('quota').textContent = claim.quota.toFixed(1);
+    const met = Paydirt.quotaMet(claim);
+    $('quotaBar').style.setProperty('--fill', Math.min(100, claim.gold / claim.quota * 100) + '%');
+    $('quotaBar').classList.toggle('met', met);
+    $('goldStat').classList.toggle('met', met);
+    $('anteNo').textContent = ante;
+    $('nextQuota').textContent = Paydirt.quota(ante + 1).toFixed(1);
     $('time').textContent = Math.ceil(timeLeft);
     $('clock').style.setProperty('--fill', (timeLeft / Paydirt.SECONDS * 100) + '%');
     $('clock').classList.toggle('low', timeLeft <= 10);
-    $('claimNo').textContent = claimNo;
     $('purse').textContent = purse.toFixed(1);
-    $('best').textContent = best.toFixed(1);
-    $('tool-dig').classList.toggle('broke', claim.energy < Paydirt.DIG_COST);
+    $('best').textContent = bestAnte;
+    $('bestGold').textContent = bestGold.toFixed(1);
+    $('probeLeft').textContent = claim.probes;
+    $('digLeft').textContent = claim.digs;
+    $('tool-probe').classList.toggle('broke', claim.probes <= 0);
+    $('tool-dig').classList.toggle('broke', claim.digs <= 0);
   }
 
   function setTool(t) {
@@ -162,13 +187,15 @@ if (typeof document !== 'undefined') (() => {
     setTimeout(() => f.remove(), 900);
   }
 
+  function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
   function act(i, forceTool) {
     if (over) return;
     const use = forceTool || tool, b = $('grid').children[i];
     const res = use === 'probe' ? Paydirt.probe(claim, i) : Paydirt.dig(claim, i);
     if (!res) {
-      if (use === 'dig' && claim.energy < Paydirt.DIG_COST && claim.tiles[i].state !== 'gold' && claim.tiles[i].state !== 'empty') {
-        $('pips').classList.remove('shake'); void $('pips').offsetWidth; $('pips').classList.add('shake');
+      if (claim.tiles[i].state !== 'gold' && claim.tiles[i].state !== 'empty') {
+        shake(use === 'probe' ? $('tool-probe') : $('tool-dig'));
         blip(140, 0.12, 'square', 0.04);
       }
       return;
@@ -178,7 +205,7 @@ if (typeof document !== 'undefined') (() => {
     if (use === 'probe') { blip(520 + res.count * 70, 0.08); }
     else if (res.gold) { float(b, '+' + res.gold.toFixed(1) + 'g', 'win'); blip(880, 0.1); setTimeout(() => blip(1320, 0.16), 90); if (navigator.vibrate) navigator.vibrate(25); }
     else { blip(180, 0.1, 'triangle'); }
-    if (Paydirt.isOver(claim)) finish(claim.found === claim.pay ? 'Claim cleaned out' : 'Out of energy');
+    if (Paydirt.isOver(claim)) finish(claim.found === claim.pay ? 'Pay streak cleared' : 'Out of probes and digs');
   }
 
   function startClock() {
@@ -198,28 +225,45 @@ if (typeof document !== 'undefined') (() => {
     if (over) return;
     over = true;
     clearInterval(ticking); ticking = null;
+    const met = Paydirt.quotaMet(claim);
     purse = Math.round((purse + claim.gold) * 10) / 10;
-    const record = claim.gold > best;
-    if (record) best = claim.gold;
-    store.set('purse', purse); store.set('best', best);
+    const reachedAnte = met ? ante + 1 : ante;
+    const newBestAnte = reachedAnte > bestAnte;
+    const newBestGold = purse > bestGold;
+    if (newBestAnte) bestAnte = reachedAnte;
+    if (newBestGold) bestGold = purse;
+    store.set('purse', purse); store.set('bestAnte', bestAnte); store.set('bestGold', bestGold);
     paint(true);
-    $('r-reason').textContent = reason;
-    $('r-grade').textContent = Paydirt.grade(claim);
-    $('r-gold').textContent = claim.gold.toFixed(1) + ' g';
-    $('r-found').textContent = `${claim.found} of ${claim.pay}`;
-    $('r-left').textContent = (Math.round((claim.available - claim.gold) * 10) / 10).toFixed(1) + ' g';
-    $('r-record').hidden = !record || claim.gold === 0;
-    setTimeout(() => { $('report').hidden = false; $('next').focus(); }, params.has('replay') ? 0 : 650);
-    if (claim.gold) { blip(660, 0.12); setTimeout(() => blip(990, 0.2), 120); }
+    if (met) {
+      $('a-title').textContent = `Ante ${ante} cleared`;
+      $('a-gold').textContent = claim.gold.toFixed(1) + ' g';
+      $('a-quota').textContent = claim.quota.toFixed(1) + ' g';
+      $('a-run').textContent = purse.toFixed(1) + ' g';
+      $('a-next').textContent = Paydirt.quota(ante + 1).toFixed(1) + ' g';
+      $('advanceBtn').textContent = `Dig Ante ${ante + 1}`;
+      setTimeout(() => { $('advance').hidden = false; $('advanceBtn').focus(); }, params.has('replay') ? 0 : 650);
+      blip(660, 0.12); setTimeout(() => blip(990, 0.2), 120); setTimeout(() => blip(1320, 0.24), 260);
+    } else {
+      $('r-reason').textContent = reason;
+      $('r-gold').textContent = claim.gold.toFixed(1) + ' g';
+      $('r-quota').textContent = claim.quota.toFixed(1) + ' g';
+      $('r-left').textContent = Math.max(0, Math.round((claim.quota - claim.gold) * 10) / 10).toFixed(1) + ' g';
+      $('r-found').textContent = `Ante ${bestAnte}`;
+      $('r-record').hidden = !newBestAnte && !newBestGold;
+      $('r-record').textContent = newBestAnte ? 'New best ante' : 'New best run';
+      setTimeout(() => { $('report').hidden = false; $('next').focus(); }, params.has('replay') ? 0 : 650);
+      if (claim.gold) { blip(660, 0.12); setTimeout(() => blip(990, 0.2), 120); }
+    }
   }
 
   function stake(advance) {
-    if (advance) claimNo++;
-    const seed = params.has('seed') ? +params.get('seed') + claimNo : (Date.now() ^ (Math.random() * 1e9)) >>> 0;
-    claim = Paydirt.newClaim(seed, claimNo);
+    if (advance) ante++;
+    else { ante = 1; purse = 0; }
+    const seed = params.has('seed') ? +params.get('seed') + ante : (Date.now() ^ (Math.random() * 1e9)) >>> 0;
+    claim = Paydirt.newClaim(seed, ante);
     timeLeft = Paydirt.SECONDS; over = false;
     clearInterval(ticking); ticking = null;
-    $('report').hidden = true; $('intro').hidden = true;
+    $('report').hidden = true; $('advance').hidden = true; $('intro').hidden = true;
     setTool('probe');
     buildGrid();
   }
@@ -229,7 +273,8 @@ if (typeof document !== 'undefined') (() => {
   $('tool-probe').addEventListener('click', () => setTool('probe'));
   $('tool-dig').addEventListener('click', () => setTool('dig'));
   $('start').addEventListener('click', () => stake(false));
-  $('next').addEventListener('click', () => stake(true));
+  $('next').addEventListener('click', () => stake(false));
+  $('advanceBtn').addEventListener('click', () => stake(true));
   $('mute').addEventListener('click', () => { muted = !muted; store.set('muted', muted); $('mute').setAttribute('aria-pressed', muted); });
   $('mute').setAttribute('aria-pressed', muted);
   document.addEventListener('keydown', (e) => {
